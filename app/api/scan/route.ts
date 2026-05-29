@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 
 import { MAX_SYMBOLS, SCAN_EMA_FAST, SCAN_EMA_SLOW } from "@/lib/constants";
 import {
-  fetchFinnhubCandles,
-  fetchFinnhubIndicator,
-  fetchFinnhubProfile,
-  fetchFinnhubQuote,
-} from "@/lib/finnhub";
+  fetchCandles,
+  fetchEmaIndicator,
+  fetchProfile,
+  fetchQuote,
+} from "@/lib/twelvedata";
 import {
   lastDayVolume,
   detectEmaCrossesInWindow,
@@ -66,7 +66,7 @@ function lastEmaValue(series: number[] | undefined): number | null {
 
 async function fetchEmaData(
   ticker: string,
-  token: string,
+  apiKey: string,
   resolution: ScanResolution,
   now: number,
 ): Promise<{
@@ -75,8 +75,8 @@ async function fetchEmaData(
 }> {
   const { from, to } = lookbackWindow(resolution, now);
   const [fast, slow] = await Promise.all([
-    fetchFinnhubIndicator(ticker, token, resolution, from, to, SCAN_EMA_FAST),
-    fetchFinnhubIndicator(ticker, token, resolution, from, to, SCAN_EMA_SLOW),
+    fetchEmaIndicator(ticker, apiKey, resolution, from, to, SCAN_EMA_FAST),
+    fetchEmaIndicator(ticker, apiKey, resolution, from, to, SCAN_EMA_SLOW),
   ]);
 
   const errors: string[] = [];
@@ -112,7 +112,7 @@ async function fetchEmaData(
 
 async function scanSymbol(
   ticker: string,
-  token: string,
+  apiKey: string,
   config: ScanConfig,
   now: number,
 ): Promise<ScanStockRow> {
@@ -120,9 +120,9 @@ async function scanSymbol(
   const candleLookback = now - 90 * DAY_SEC;
 
   const [quote, profile, candles] = await Promise.all([
-    fetchFinnhubQuote(ticker, token),
-    fetchFinnhubProfile(ticker, token),
-    needsCandles ? fetchFinnhubCandles(ticker, token, candleLookback, now, "D") : null,
+    fetchQuote(ticker, apiKey),
+    fetchProfile(ticker, apiKey),
+    needsCandles ? fetchCandles(ticker, apiKey, candleLookback, now, "D") : null,
   ]);
 
   const price = quote?.c ?? null;
@@ -135,7 +135,7 @@ async function scanSymbol(
   for (const resolution of SCAN_RESOLUTIONS) {
     const { bullish, bearish } = emaFiltersEnabledForResolution(config.enabled, resolution);
     if (!bullish && !bearish) continue;
-    const result = await fetchEmaData(ticker, token, resolution, now);
+    const result = await fetchEmaData(ticker, apiKey, resolution, now);
     ema[resolution] = result.snapshot;
     emaCross[resolution] = result.cross;
   }
@@ -152,7 +152,7 @@ async function scanSymbol(
 
   return {
     ticker,
-    name: profile?.name?.trim() || ticker,
+    name: quote?.name?.trim() || profile?.name?.trim() || ticker,
     metrics,
     passes,
     passesAll: passesAllEnabledFilters(passes),
@@ -160,10 +160,10 @@ async function scanSymbol(
 }
 
 export async function POST(request: Request) {
-  const token = process.env.FINNHUB_API_KEY?.trim();
-  if (!token) {
+  const apiKey = process.env.TWELVE_DATA_API_KEY?.trim();
+  if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing FINNHUB_API_KEY environment variable." },
+      { error: "Missing TWELVE_DATA_API_KEY environment variable." },
       { status: 500 },
     );
   }
@@ -209,7 +209,7 @@ export async function POST(request: Request) {
   const now = Math.floor(Date.now() / 1000);
 
   const rows = await mapWithConcurrency(unique, 2, (ticker) =>
-    scanSymbol(ticker, token, config, now),
+    scanSymbol(ticker, apiKey, config, now),
   );
 
   const orderIndex = Object.fromEntries(unique.map((sym, i) => [sym, i]));

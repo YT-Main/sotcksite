@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 
 import { DEFAULT_MA_PERIOD, MAX_SYMBOLS } from "@/lib/constants";
-import { fetchFinnhubCandles, fetchFinnhubProfile, fetchFinnhubQuote } from "@/lib/finnhub";
 import { sma, weeklyGainPercent } from "@/lib/indicators";
 import { normalizeSymbol } from "@/lib/symbols";
 import type { AlertStockRow } from "@/lib/stock-types";
+import { fetchCandles, fetchQuote } from "@/lib/twelvedata";
 
 const CANDLE_LOOKBACK_DAYS = 120;
 
 export async function POST(request: Request) {
-  const token = process.env.FINNHUB_API_KEY?.trim();
-  if (!token) {
+  const apiKey = process.env.TWELVE_DATA_API_KEY?.trim();
+  if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing FINNHUB_API_KEY environment variable." },
+      { error: "Missing TWELVE_DATA_API_KEY environment variable." },
       { status: 500 },
     );
   }
@@ -62,10 +62,9 @@ export async function POST(request: Request) {
 
   const rows = await Promise.all(
     unique.map(async (ticker): Promise<AlertStockRow> => {
-      const [quote, profile, candles] = await Promise.all([
-        fetchFinnhubQuote(ticker, token),
-        fetchFinnhubProfile(ticker, token),
-        fetchFinnhubCandles(ticker, token, from, now),
+      const [quote, candles] = await Promise.all([
+        fetchQuote(ticker, apiKey),
+        fetchCandles(ticker, apiKey, from, now),
       ]);
 
       const price = quote?.c ?? null;
@@ -89,7 +88,7 @@ export async function POST(request: Request) {
 
       return {
         ticker,
-        name: profile?.name?.trim() || ticker,
+        name: quote?.name?.trim() || ticker,
         open: quote?.o ?? null,
         prevClose,
         price,

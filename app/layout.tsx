@@ -9,7 +9,7 @@ import { WatchlistProvider } from "@/components/WatchlistProvider";
 
 export const metadata: Metadata = {
   title: "Stock site",
-  description: "Watchlists backed by Finnhub",
+  description: "Watchlists backed by Twelve Data",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -251,7 +251,7 @@ export default function ScanClient() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-white tracking-tight">Stock scan</h1>
         <p className="text-zinc-400 text-sm">
-          Run togglable filters against a ticker list using Finnhub quotes, fundamentals, and EMA
+          Run togglable filters against a ticker list using Twelve Data quotes, fundamentals, and EMA
           indicators.
         </p>
       </header>
@@ -335,7 +335,7 @@ export default function ScanClient() {
 
         <div className="space-y-3 pt-2 border-t border-zinc-800">
           <p className="text-xs text-zinc-500">
-            EMA 8 / 21 cross in the last {SCAN_EMA_CROSS_TRADING_DAYS} trading days (Finnhub
+            EMA 8 / 21 cross in the last {SCAN_EMA_CROSS_TRADING_DAYS} trading days (Twelve Data
             indicator). 30m and hourly may be unavailable for some exchanges.
           </p>
           {SCAN_RESOLUTIONS.map((res) => {
@@ -390,7 +390,7 @@ export default function ScanClient() {
       {error && <p className="text-sm text-rose-400">{error}</p>}
 
       {loading && !rows.length && (
-        <p className="text-sm text-zinc-400">Fetching data from Finnhub…</p>
+        <p className="text-sm text-zinc-400">Fetching data from Twelve Data…</p>
       )}
 
       {!loading && rows.length > 0 && (

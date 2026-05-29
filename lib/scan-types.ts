@@ -1,4 +1,4 @@
-import type { CandleResolution } from "@/lib/finnhub";
+import type { CandleResolution } from "@/lib/twelvedata";
 
 export type ScanResolution = CandleResolution;
 
