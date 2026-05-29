@@ -9,7 +9,13 @@ export default function Nav() {
           All stocks
         </Link>
         <Link className="text-zinc-200 hover:text-white" href="/selected">
-          Selected
+          Alerts
+        </Link>
+        <Link className="text-zinc-200 hover:text-white" href="/portfolio">
+          Portfolio
+        </Link>
+        <Link className="text-zinc-200 hover:text-white" href="/scan">
+          Scan
         </Link>
       </div>
     </nav>

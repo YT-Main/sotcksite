@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes alert-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes alert-highlight {
+  0%,
+  100% {
+    background-color: rgb(245 158 11 / 0.12);
+  }
+  50% {
+    background-color: rgb(245 158 11 / 0.22);
+  }
+}
+
+.animate-alert-pop {
+  animation: alert-pop 0.35s ease-out;
+}
+
+.animate-alert-highlight {
+  animation: alert-highlight 2s ease-in-out infinite;
+}
+
 body {
   @apply bg-zinc-950 text-zinc-100 antialiased;
 }

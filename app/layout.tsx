@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import Nav from "@/components/Nav";
+import { AlertProvider } from "@/components/AlertProvider";
+import { PortfolioProvider } from "@/components/PortfolioProvider";
 import { WatchlistProvider } from "@/components/WatchlistProvider";
 
 export const metadata: Metadata = {
@@ -15,8 +17,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className="min-h-screen bg-zinc-950">
         <WatchlistProvider>
-          <Nav />
-          <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+          <AlertProvider>
+            <PortfolioProvider>
+              <Nav />
+              <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+            </PortfolioProvider>
+          </AlertProvider>
         </WatchlistProvider>
       </body>
     </html>

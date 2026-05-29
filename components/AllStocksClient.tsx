@@ -1,51 +1,71 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import StockTable from "@/components/StockTable";
 import { useWatchlist } from "@/components/WatchlistProvider";
 import type { StockRow } from "@/lib/stock-types";
 
+const REFRESH_INTERVAL_MS = 60_000;
+
 export default function AllStocksClient() {
-  const { watchlist, selectedSymbols, addTicker, toggleSelected } = useWatchlist();
+  const { watchlist, addTicker } = useWatchlist();
   const [draft, setDraft] = useState("");
   const [rows, setRows] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const inFlightRef = useRef(false);
 
   const symKey = useMemo(() => watchlist.join(","), [watchlist]);
 
-  const refresh = useCallback(async () => {
-    if (!watchlist.length) {
-      setRows([]);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/stocks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbols: watchlist }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Unable to load quotes.");
+  const refresh = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!watchlist.length) {
         setRows([]);
+        setLastUpdated(null);
         return;
       }
-      setRows(Array.isArray(data?.rows) ? data.rows : []);
-    } catch {
-      setError("Network error while loading quotes.");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [watchlist]);
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+      if (!silent) setLoading(true);
+      try {
+        const res = await fetch("/api/stocks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbols: watchlist }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setError(typeof data?.error === "string" ? data.error : "Unable to load quotes.");
+          if (!silent) setRows([]);
+          return;
+        }
+        setError(null);
+        setRows(Array.isArray(data?.rows) ? data.rows : []);
+        setLastUpdated(Date.now());
+      } catch {
+        setError("Network error while loading quotes.");
+        if (!silent) setRows([]);
+      } finally {
+        if (!silent) setLoading(false);
+        inFlightRef.current = false;
+      }
+    },
+    [watchlist],
+  );
 
   useEffect(() => {
     refresh();
   }, [symKey, refresh]);
+
+  useEffect(() => {
+    if (!watchlist.length) return;
+    const id = window.setInterval(() => {
+      refresh({ silent: true });
+    }, REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [symKey, refresh, watchlist.length]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -58,8 +78,7 @@ export default function AllStocksClient() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-white tracking-tight">All stocks</h1>
         <p className="text-zinc-400 text-sm">
-          Symbols are saved in local storage. Check &ldquo;Pinned&rdquo; to show a company on the
-          Selected page.
+          Symbols are saved in local storage. Set up price alerts on the Alerts page.
         </p>
       </header>
 
@@ -82,21 +101,19 @@ export default function AllStocksClient() {
         <button
           type="button"
           className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
-          onClick={refresh}
+          onClick={() => refresh()}
           disabled={loading}
         >
           Refresh
         </button>
+        <span className="text-xs text-zinc-500 ml-auto" aria-live="polite">
+          {lastUpdated
+            ? `Live · updated ${new Date(lastUpdated).toLocaleTimeString()}`
+            : "Live prices"}
+        </span>
       </form>
 
-      <StockTable
-        error={error}
-        loading={loading}
-        rows={rows}
-        selectable
-        selectedSymbols={selectedSymbols}
-        onToggleSelected={toggleSelected}
-      />
+      <StockTable error={error} loading={loading} rows={rows} />
     </div>
   );
 }

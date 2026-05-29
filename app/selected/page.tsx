@@ -1,5 +1,5 @@
-import SelectedStocksClient from "@/components/SelectedStocksClient";
+import AlertsClient from "@/components/AlertsClient";
 
 export default function SelectedPage() {
-  return <SelectedStocksClient />;
+  return <AlertsClient />;
 }
