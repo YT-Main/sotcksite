@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { MAX_SYMBOLS, SCAN_ADTV_DAYS, SCAN_EMA_FAST, SCAN_EMA_SLOW } from "@/lib/constants";
+import { MAX_SYMBOLS, SCAN_EMA_FAST, SCAN_EMA_SLOW } from "@/lib/constants";
 import {
   fetchFinnhubCandles,
   fetchFinnhubIndicator,
@@ -8,7 +8,7 @@ import {
   fetchFinnhubQuote,
 } from "@/lib/finnhub";
 import {
-  averageDailyVolume,
+  lastDayVolume,
   detectEmaCrossesInWindow,
   emaFiltersEnabledForResolution,
   evaluateScanPasses,
@@ -85,10 +85,7 @@ async function scanSymbol(
 
   const price = quote?.c ?? null;
   const marketCapMillions = profile?.marketCapitalization ?? null;
-  const avgVolume20 =
-    candles?.v && candles.v.length >= SCAN_ADTV_DAYS
-      ? averageDailyVolume(candles.v, SCAN_ADTV_DAYS)
-      : null;
+  const lastVol = candles?.v?.length ? lastDayVolume(candles.v) : null;
 
   const emaCross: ScanMetrics["emaCross"] = { D: null, "30": null, "60": null };
 
@@ -100,7 +97,7 @@ async function scanSymbol(
 
   const metrics: ScanMetrics = {
     price,
-    avgVolume20,
+    lastDayVolume: lastVol,
     marketCapMillions,
     emaCross,
   };

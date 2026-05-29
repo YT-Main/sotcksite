@@ -1,4 +1,4 @@
-import { SCAN_ADTV_DAYS, SCAN_EMA_CROSS_TRADING_DAYS } from "@/lib/constants";
+import { SCAN_EMA_CROSS_TRADING_DAYS } from "@/lib/constants";
 import {
   DEFAULT_SCAN_CONFIG,
   DEFAULT_SCAN_THRESHOLDS,
@@ -11,12 +11,10 @@ import {
   type ScanThresholds,
 } from "@/lib/scan-types";
 
-export function averageDailyVolume(volumes: number[], days = SCAN_ADTV_DAYS): number | null {
+export function lastDayVolume(volumes: number[]): number | null {
   const valid = volumes.filter((v) => Number.isFinite(v) && v >= 0);
-  if (valid.length < days) return null;
-  const slice = valid.slice(-days);
-  const sum = slice.reduce((a, b) => a + b, 0);
-  return sum / days;
+  if (!valid.length) return null;
+  return valid[valid.length - 1];
 }
 
 function dayKeyFromUnix(sec: number): number {
@@ -156,7 +154,7 @@ export function evaluateScanPasses(metrics: ScanMetrics, config: ScanConfig): Sc
 
   return {
     minVolume: enabled.minVolume
-      ? metrics.avgVolume20 !== null && metrics.avgVolume20 > thresholds.minAvgVolume
+      ? metrics.lastDayVolume !== null && metrics.lastDayVolume > thresholds.minLastDayVolume
       : null,
     minPrice: enabled.minPrice
       ? metrics.price !== null && metrics.price > thresholds.minPrice
@@ -183,9 +181,13 @@ function parseThresholds(raw: unknown): ScanThresholds {
   const base = { ...DEFAULT_SCAN_THRESHOLDS };
   if (typeof raw !== "object" || raw === null) return base;
   const obj = raw as Record<string, unknown>;
-  if (typeof obj.minAvgVolume === "number" && obj.minAvgVolume > 0) {
-    base.minAvgVolume = obj.minAvgVolume;
-  }
+  const vol =
+    typeof obj.minLastDayVolume === "number"
+      ? obj.minLastDayVolume
+      : typeof obj.minAvgVolume === "number"
+        ? obj.minAvgVolume
+        : null;
+  if (vol !== null && vol > 0) base.minLastDayVolume = vol;
   if (typeof obj.minPrice === "number" && obj.minPrice > 0) {
     base.minPrice = obj.minPrice;
   }
@@ -224,7 +226,7 @@ export function parseScanConfig(raw: unknown): ScanConfig {
 
   const toggles = parseToggles(raw);
   const hasThresholdKeys =
-    "minAvgVolume" in obj || "minPrice" in obj || "minMarketCapBillions" in obj;
+    "minLastDayVolume" in obj || "minAvgVolume" in obj || "minPrice" in obj || "minMarketCapBillions" in obj;
   return {
     enabled: toggles,
     thresholds: hasThresholdKeys ? parseThresholds(raw) : { ...DEFAULT_SCAN_THRESHOLDS },

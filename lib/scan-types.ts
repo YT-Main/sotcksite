@@ -15,8 +15,8 @@ export type ScanFilterToggles = {
 };
 
 export type ScanThresholds = {
-  /** Minimum 20-day average daily share volume */
-  minAvgVolume: number;
+  /** Minimum last trading day share volume */
+  minLastDayVolume: number;
   /** Minimum current price (USD) */
   minPrice: number;
   /** Minimum market cap (billions USD) */
@@ -32,7 +32,7 @@ export type ScanConfig = {
 export type ScanFilters = ScanFilterToggles;
 
 export const DEFAULT_SCAN_THRESHOLDS: ScanThresholds = {
-  minAvgVolume: 1_000_000,
+  minLastDayVolume: 1_000_000,
   minPrice: 5,
   minMarketCapBillions: 10,
 };
@@ -63,7 +63,7 @@ export type EmaCrossState = {
 
 export type ScanMetrics = {
   price: number | null;
-  avgVolume20: number | null;
+  lastDayVolume: number | null;
   marketCapMillions: number | null;
   emaCross: Record<ScanResolution, EmaCrossState | null>;
 };

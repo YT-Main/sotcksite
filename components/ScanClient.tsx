@@ -84,7 +84,7 @@ function isEmaFilterKey(key: keyof ScanFilterToggles): boolean {
 }
 
 function filterColumnLabel(key: keyof ScanFilterToggles, thresholds: ScanThresholds): string {
-  if (key === "minVolume") return `Vol > ${fmtVolume(thresholds.minAvgVolume)}`;
+  if (key === "minVolume") return `Vol > ${fmtVolume(thresholds.minLastDayVolume)}`;
   if (key === "minPrice") return `Price > $${thresholds.minPrice}`;
   if (key === "minMarketCap") return `Mkt cap > $${thresholds.minMarketCapBillions}B`;
   if (key === "emaBullishD") return "EMA8↑21 Daily";
@@ -259,14 +259,14 @@ export default function ScanClient() {
 
         <div className="space-y-3">
           <FundamentalFilterRow
-            label="20-day avg volume"
+            label="Last day volume"
             enabled={config.enabled.minVolume}
             onEnabledChange={(v) => setEnabled("minVolume", v)}
           >
             <span className="text-zinc-500 text-sm">&gt;</span>
             <ThresholdInput
-              value={config.thresholds.minAvgVolume}
-              onChange={(v) => setThreshold("minAvgVolume", v)}
+              value={config.thresholds.minLastDayVolume}
+              onChange={(v) => setThreshold("minLastDayVolume", v)}
               disabled={!config.enabled.minVolume}
               step={100_000}
             />
@@ -371,7 +371,7 @@ export default function ScanClient() {
                 <th className="px-4 py-3 font-medium">Ticker</th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium text-right">Price</th>
-                <th className="px-4 py-3 font-medium text-right">20d avg vol</th>
+                <th className="px-4 py-3 font-medium text-right">Last day vol</th>
                 <th className="px-4 py-3 font-medium text-right">Mkt cap</th>
                 {activeFilterKeys.map((key) => (
                   <th key={key} className="px-3 py-3 font-medium text-center whitespace-nowrap">
@@ -406,7 +406,7 @@ export default function ScanClient() {
                       {fmtMoney(row.metrics.price)}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
-                      {fmtVolume(row.metrics.avgVolume20)}
+                      {fmtVolume(row.metrics.lastDayVolume)}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {fmtMarketCap(row.metrics.marketCapMillions)}
