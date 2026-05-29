@@ -61,10 +61,17 @@ export type EmaCrossState = {
   bearishCrossDay: string | null;
 };
 
+export type EmaSnapshot = {
+  ema8: number | null;
+  ema21: number | null;
+  error: string | null;
+};
+
 export type ScanMetrics = {
   price: number | null;
   lastDayVolume: number | null;
   marketCapMillions: number | null;
+  ema: Record<ScanResolution, EmaSnapshot | null>;
   emaCross: Record<ScanResolution, EmaCrossState | null>;
 };
 

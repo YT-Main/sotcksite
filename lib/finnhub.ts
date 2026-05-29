@@ -28,6 +28,10 @@ export type FinnhubIndicator = {
   s?: string;
 };
 
+export type FinnhubFetchResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
+
 export type CandleResolution = "D" | "30" | "60";
 
 function withToken(searchParams: Record<string, string>, token: string) {
@@ -81,7 +85,7 @@ export async function fetchFinnhubIndicator(
   from: number,
   to: number,
   timeperiod: number,
-): Promise<FinnhubIndicator | null> {
+): Promise<FinnhubFetchResult<FinnhubIndicator>> {
   const qs = withToken(
     {
       symbol,
@@ -93,9 +97,35 @@ export async function fetchFinnhubIndicator(
     },
     token,
   );
-  const res = await fetch(`${BASE}/indicator?${qs}`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const data = (await res.json()) as FinnhubIndicator;
-  if (data?.s !== "ok" || !Array.isArray(data.ema) || !data.ema.length) return null;
-  return data;
+  try {
+    const res = await fetch(`${BASE}/indicator?${qs}`, { cache: "no-store" });
+    if (!res.ok) {
+      let msg = res.statusText;
+      try {
+        const errBody = (await res.json()) as { error?: string };
+        if (typeof errBody?.error === "string") msg = errBody.error;
+      } catch {
+        /* ignore */
+      }
+      return { ok: false, error: `Finnhub ${res.status}: ${msg}` };
+    }
+    const data = (await res.json()) as FinnhubIndicator;
+    if (data?.s !== "ok") {
+      const status = data?.s ?? "unknown";
+      const msg =
+        status === "no_data"
+          ? "No EMA data for this symbol/resolution"
+          : `Indicator status: ${status}`;
+      return { ok: false, error: msg };
+    }
+    if (!Array.isArray(data.ema) || !data.ema.length) {
+      return { ok: false, error: "Empty EMA series returned" };
+    }
+    return { ok: true, data };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to fetch EMA indicator",
+    };
+  }
 }

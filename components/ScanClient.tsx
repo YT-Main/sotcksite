@@ -19,6 +19,7 @@ import {
   type ScanResolution,
   type ScanStockRow,
   type ScanThresholds,
+  type EmaSnapshot,
 } from "@/lib/scan-types";
 import { normalizeSymbol } from "@/lib/symbols";
 
@@ -105,20 +106,35 @@ function emaResolutionForKey(key: keyof ScanFilterToggles): ScanResolution | nul
 function PassCell({
   pass,
   crossDay,
+  emaSnapshot,
 }: {
   pass: boolean | null;
   crossDay: string | null;
+  emaSnapshot?: EmaSnapshot | null;
 }) {
-  if (pass === null) return <span className="text-zinc-600">—</span>;
+  if (pass === null && !emaSnapshot) return <span className="text-zinc-600">—</span>;
   return (
     <div className="flex flex-col items-center gap-0.5">
-      {pass ? (
+      {pass === null ? (
+        <span className="text-zinc-600">—</span>
+      ) : pass ? (
         <span className="text-emerald-400">✓</span>
       ) : (
         <span className="text-rose-400">✗</span>
       )}
       {pass && crossDay && (
         <span className="text-[10px] text-zinc-500 leading-tight">{crossDay}</span>
+      )}
+      {emaSnapshot && (
+        <span className="text-[10px] leading-tight text-center max-w-[120px]">
+          {emaSnapshot.error ? (
+            <span className="text-rose-400">{emaSnapshot.error}</span>
+          ) : (
+            <span className="text-zinc-500">
+              8: {fmtMoney(emaSnapshot.ema8)} / 21: {fmtMoney(emaSnapshot.ema21)}
+            </span>
+          )}
+        </span>
       )}
     </div>
   );
@@ -202,8 +218,22 @@ export default function ScanClient() {
         setError(typeof data?.error === "string" ? data.error : "Scan failed.");
         return;
       }
-      setRows(Array.isArray(data?.rows) ? data.rows : []);
+      const nextRows: ScanStockRow[] = Array.isArray(data?.rows) ? data.rows : [];
+      setRows(nextRows);
       setScannedAt(typeof data?.scannedAt === "number" ? data.scannedAt : Date.now());
+
+      const emaErrors: string[] = [];
+      for (const row of nextRows) {
+        for (const res of SCAN_RESOLUTIONS) {
+          const snap = row.metrics.ema[res];
+          if (snap?.error) {
+            emaErrors.push(`${row.ticker} (${SCAN_RESOLUTION_LABELS[res]}): ${snap.error}`);
+          }
+        }
+      }
+      if (emaErrors.length) {
+        window.alert(`EMA data unavailable:\n\n${emaErrors.join("\n")}`);
+      }
     } catch {
       setError("Network error while scanning.");
     } finally {
@@ -414,14 +444,20 @@ export default function ScanClient() {
                     {activeFilterKeys.map((key) => {
                       const pass = row.passes[key as keyof ScanPassResults];
                       let crossDay: string | null = null;
-                      if (isEmaFilterKey(key) && pass) {
+                      let emaSnapshot: EmaSnapshot | null = null;
+                      if (isEmaFilterKey(key)) {
                         const res = emaResolutionForKey(key);
-                        const kind = key.includes("Bullish") ? "bullish" : "bearish";
-                        if (res) crossDay = emaCrossDayForPass(row.metrics, res, kind);
+                        if (res) {
+                          emaSnapshot = row.metrics.ema[res];
+                          if (pass) {
+                            const kind = key.includes("Bullish") ? "bullish" : "bearish";
+                            crossDay = emaCrossDayForPass(row.metrics, res, kind);
+                          }
+                        }
                       }
                       return (
                         <td key={key} className="px-3 py-2.5 text-center">
-                          <PassCell pass={pass} crossDay={crossDay} />
+                          <PassCell pass={pass} crossDay={crossDay} emaSnapshot={emaSnapshot} />
                         </td>
                       );
                     })}

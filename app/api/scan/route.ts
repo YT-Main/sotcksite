@@ -15,7 +15,13 @@ import {
   parseScanConfig,
   passesAllEnabledFilters,
 } from "@/lib/scan-utils";
-import type { ScanConfig, ScanMetrics, ScanResolution, ScanStockRow } from "@/lib/scan-types";
+import type {
+  EmaSnapshot,
+  ScanConfig,
+  ScanMetrics,
+  ScanResolution,
+  ScanStockRow,
+} from "@/lib/scan-types";
 import { SCAN_RESOLUTIONS } from "@/lib/scan-types";
 import { normalizeSymbol } from "@/lib/symbols";
 
@@ -52,20 +58,56 @@ function lookbackWindow(resolution: ScanResolution, now: number): { from: number
   return { from: now - days * DAY_SEC, to: now };
 }
 
-async function fetchEmaCross(
+function lastEmaValue(series: number[] | undefined): number | null {
+  if (!series?.length) return null;
+  const v = series[series.length - 1];
+  return Number.isFinite(v) ? v : null;
+}
+
+async function fetchEmaData(
   ticker: string,
   token: string,
   resolution: ScanResolution,
   now: number,
-): Promise<ScanMetrics["emaCross"][ScanResolution]> {
+): Promise<{
+  snapshot: EmaSnapshot;
+  cross: ScanMetrics["emaCross"][ScanResolution];
+}> {
   const { from, to } = lookbackWindow(resolution, now);
   const [fast, slow] = await Promise.all([
     fetchFinnhubIndicator(ticker, token, resolution, from, to, SCAN_EMA_FAST),
     fetchFinnhubIndicator(ticker, token, resolution, from, to, SCAN_EMA_SLOW),
   ]);
-  if (!fast?.ema || !slow?.ema) return null;
-  const timestamps = fast.t?.length ? fast.t : slow.t;
-  return detectEmaCrossesInWindow(fast.ema, slow.ema, timestamps, resolution);
+
+  const errors: string[] = [];
+  if (!fast.ok) errors.push(`EMA${SCAN_EMA_FAST}: ${fast.error}`);
+  if (!slow.ok) errors.push(`EMA${SCAN_EMA_SLOW}: ${slow.error}`);
+
+  const ema8 = fast.ok ? lastEmaValue(fast.data.ema) : null;
+  const ema21 = slow.ok ? lastEmaValue(slow.data.ema) : null;
+
+  console.log(
+    `[scan] ${ticker} ${resolution} EMA${SCAN_EMA_FAST}=${ema8 ?? "—"} EMA${SCAN_EMA_SLOW}=${ema21 ?? "—"}${errors.length ? ` errors: ${errors.join("; ")}` : ""}`,
+  );
+
+  const snapshot: EmaSnapshot = {
+    ema8,
+    ema21,
+    error: errors.length ? errors.join("; ") : null,
+  };
+
+  if (!fast.ok || !slow.ok) {
+    return { snapshot, cross: null };
+  }
+
+  const timestamps = fast.data.t?.length ? fast.data.t : slow.data.t;
+  const cross = detectEmaCrossesInWindow(
+    fast.data.ema!,
+    slow.data.ema!,
+    timestamps,
+    resolution,
+  );
+  return { snapshot, cross };
 }
 
 async function scanSymbol(
@@ -87,18 +129,22 @@ async function scanSymbol(
   const marketCapMillions = profile?.marketCapitalization ?? null;
   const lastVol = candles?.v?.length ? lastDayVolume(candles.v) : null;
 
+  const ema: ScanMetrics["ema"] = { D: null, "30": null, "60": null };
   const emaCross: ScanMetrics["emaCross"] = { D: null, "30": null, "60": null };
 
   for (const resolution of SCAN_RESOLUTIONS) {
     const { bullish, bearish } = emaFiltersEnabledForResolution(config.enabled, resolution);
     if (!bullish && !bearish) continue;
-    emaCross[resolution] = await fetchEmaCross(ticker, token, resolution, now);
+    const result = await fetchEmaData(ticker, token, resolution, now);
+    ema[resolution] = result.snapshot;
+    emaCross[resolution] = result.cross;
   }
 
   const metrics: ScanMetrics = {
     price,
     lastDayVolume: lastVol,
     marketCapMillions,
+    ema,
     emaCross,
   };
 
